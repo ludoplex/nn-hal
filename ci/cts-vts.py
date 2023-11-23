@@ -32,9 +32,7 @@ def main(argv):
 		print_usage()
 
 	for opt, arg in opts:
-		if opt == "--help":
-			print_usage()
-		elif opt == "--cts":
+		if opt == "--cts":
 			test_suite_binary = "cros_nnapi_cts"
 		elif opt == "--vts10":
 			test_suite_binary = "cros_nnapi_vts_1_0"
@@ -48,7 +46,7 @@ def main(argv):
 			print_usage()
 
 	now = datetime.datetime.now()
-	print("Start time: {}".format(now))
+	print(f"Start time: {now}")
 	begin = time.time()
 
 	tests = get_tests()
@@ -60,7 +58,7 @@ def main(argv):
 	#	run_test(ltest)
 
 	output_file = opt.lstrip("-") + "_" + now.strftime("%Y%m%d_%H%M%S") + ".csv"
-	print("Writing results to output file {}. Please wait..".format(output_file))
+	print(f"Writing results to output file {output_file}. Please wait..")
 	with open(output_file, "w") as out:
 		heading = "VTS/CTS Command" + "," + "Result"
 		print(heading, file=out)
@@ -70,7 +68,7 @@ def main(argv):
 	end = time.time()
 	summary()
 
-	print("Duration (sec): {}".format(end - begin))
+	print(f"Duration (sec): {end - begin}")
 
 def print_usage():
 		print("USAGE    : python cts-vts.py --<options>")
@@ -89,25 +87,22 @@ def get_tests():
 	global total
 	tests = []
 
-	get_tests_file = test_suite_binary + ".json"
-	get_tests_cmd = test_suite_binary + " " + "--gtest_list_tests" + " " + "--gtest_output=json:" + get_tests_file
+	get_tests_file = f"{test_suite_binary}.json"
+	get_tests_cmd = f"{test_suite_binary} --gtest_list_tests --gtest_output=json:{get_tests_file}"
 	subprocess.getoutput(get_tests_cmd)
 	time.sleep(5)
 
 	with open(get_tests_file) as json_file:
-			data = json.load(json_file)
-			total = data["tests"]
-			for ts in data["testsuites"]:
-					test_suite = ts["name"]
-					test_name = ""
-					for t in ts["testsuite"]:
-						test_name = test_suite + "." + t["name"]
-						tests.append(test_name)
-
-			if os.path.exists(get_tests_file):
-				os.remove(get_tests_file)
-			else:
-				print("Could not remove file {}. The file does not exist.".format(get_tests_file))
+		data = json.load(json_file)
+		total = data["tests"]
+		test_name = ""
+		for ts in data["testsuites"]:
+			test_suite = ts["name"]
+			tests.extend(f"{test_suite}." + t["name"] for t in ts["testsuite"])
+		if os.path.exists(get_tests_file):
+			os.remove(get_tests_file)
+		else:
+			print(f"Could not remove file {get_tests_file}. The file does not exist.")
 
 	return tests
 
@@ -123,7 +118,7 @@ def run_test(ltest):
 	global test_suite_binary
 
 	test = ltest.strip().split(" ", 1)[0]
-	test_cmd = test_suite_binary + " " + " --gtest_filter=" + test
+	test_cmd = f"{test_suite_binary}  --gtest_filter={test}"
 
 	proc = subprocess.Popen(test_cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)
 	try:
@@ -132,7 +127,7 @@ def run_test(ltest):
 		proc.kill()
 		hang = hang + 1
 		status = "HANG"
-		result = test_cmd + "," + status
+		result = f"{test_cmd},{status}"
 		shared_result.add(result)
 		return
 
@@ -149,14 +144,14 @@ def run_test(ltest):
 		error = error + 1
 		status = "ERROR " + "(" + str(proc.returncode) + ")"
 
-	result = test_cmd + "," + status
+	result = f"{test_cmd},{status}"
 	os.system("rm -rf /var/spool/crash/*")
 
 	shared_result.add(result)
 
 	count = count + 1
 	if count % 1000 == 0:
-                print("Completed [{}/{}] tests..".format(count, total))
+		print(f"Completed [{count}/{total}] tests..")
 
 	return
 
